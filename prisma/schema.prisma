@@ -21,7 +21,9 @@ model Branch {
   phone     String?
   createdAt DateTime @default(now())
 
-  users User[]
+  users      User[]
+  stockItems BranchStock[]
+  sales      Sale[]
 }
 
 model User {
@@ -33,4 +35,64 @@ model User {
   branchId  String?
   branch    Branch?  @relation(fields: [branchId], references: [id])
   createdAt DateTime @default(now())
+}
+
+model Medicine {
+  id           String   @id @default(cuid())
+  name         String
+  manufacturer String
+  unit         String
+  reorderLevel Int      @default(10)
+  requiresRx   Boolean  @default(false)
+
+  batches Batch[]
+}
+
+model Batch {
+  id           String   @id @default(cuid())
+  medicineId   String
+  medicine     Medicine @relation(fields: [medicineId], references: [id])
+  batchNumber  String
+  expiryDate   DateTime
+  costPrice    Decimal
+  sellingPrice Decimal
+  createdAt    DateTime @default(now())
+
+  branchStock BranchStock[]
+  saleItems   SaleItem[]
+
+  @@unique([medicineId, batchNumber])
+}
+
+model BranchStock {
+  id        String   @id @default(cuid())
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  batchId   String
+  batch     Batch    @relation(fields: [batchId], references: [id])
+  quantity  Int
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, batchId])
+}
+
+model Sale {
+  id          String   @id @default(cuid())
+  branchId    String
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  soldById    String
+  totalAmount Decimal
+  createdAt   DateTime @default(now())
+
+  items SaleItem[]
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  batchId   String
+  batch     Batch   @relation(fields: [batchId], references: [id])
+  quantity  Int
+  unitPrice Decimal
 }
