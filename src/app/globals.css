@@ -24,3 +24,14 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+input,
+select,
+textarea {
+  color: #0f172a; /* slate-900 — dark text */
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8; /* slate-400 — lighter gray for placeholder text specifically */
+}
