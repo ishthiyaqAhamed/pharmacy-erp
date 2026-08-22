@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { SalesChart } from "./sales-chart";
 
 function daysFromNow(days: number) {
   const d = new Date();
@@ -10,7 +11,7 @@ function daysFromNow(days: number) {
 export default async function DashboardPage() {
   const session = await auth();
 
-  const [lowStock, nearExpiry, todaySales] = await Promise.all([
+  const [lowStock, nearExpiry, todaySales, recentSales] = await Promise.all([
     prisma.branchStock.findMany({
       where: { quantity: { lte: 10 } },
       include: { batch: { include: { medicine: true } }, branch: true },
@@ -30,7 +31,23 @@ export default async function DashboardPage() {
       _sum: { totalAmount: true },
       _count: true,
     }),
+    prisma.sale.findMany({
+      where: {
+        createdAt: { gte: daysFromNow(-7) },
+      },
+      select: { totalAmount: true, createdAt: true },
+    }),
   ]);
+
+  const chartData: { day: string; total: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const date = daysFromNow(-i);
+    const dayLabel = date.toLocaleDateString("en-US", { weekday: "short" });
+    const dayTotal = recentSales
+      .filter((s) => s.createdAt.toDateString() === date.toDateString())
+      .reduce((sum, s) => sum + Number(s.totalAmount), 0);
+    chartData.push({ day: dayLabel, total: dayTotal });
+  }
 
   return (
     <div className="space-y-6">
@@ -59,6 +76,11 @@ export default async function DashboardPage() {
           <p className="mt-1 text-2xl font-semibold text-red-600">{nearExpiry.length}</p>
           <p className="text-xs text-slate-400">batches</p>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Last 7 Days Sales</h2>
+        <SalesChart data={chartData} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
