@@ -11,8 +11,8 @@ function daysFromNow(days: number) {
 export default async function DashboardPage() {
   const session = await auth();
 
-  const [lowStock, nearExpiry, todaySales, recentSales] = await Promise.all([
-    prisma.branchStock.findMany({
+const [lowStock, nearExpiry, todaySales, recentSales, topSellingRaw] = await Promise.all([
+      prisma.branchStock.findMany({
       where: { quantity: { lte: 10 } },
       include: { batch: { include: { medicine: true } }, branch: true },
       orderBy: { quantity: "asc" },
@@ -37,7 +37,26 @@ export default async function DashboardPage() {
       },
       select: { totalAmount: true, createdAt: true },
     }),
+    prisma.saleItem.groupBy({
+      by: ["batchId"],
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: "desc" } },
+      take: 5,
+    }),
   ]);
+  const topBatchIds = topSellingRaw.map((t) => t.batchId);
+  const topBatches = await prisma.batch.findMany({
+    where: { id: { in: topBatchIds } },
+    include: { medicine: true },
+  });
+
+  const topSelling = topSellingRaw.map((t) => {
+    const batch = topBatches.find((b) => b.id === t.batchId);
+    return {
+      medicineName: batch?.medicine.name ?? "Unknown",
+      quantitySold: t._sum.quantity ?? 0,
+    };
+  });
 
   const chartData: { day: string; total: number }[] = [];
   for (let i = 6; i >= 0; i--) {
@@ -76,6 +95,22 @@ export default async function DashboardPage() {
           <p className="mt-1 text-2xl font-semibold text-red-600">{nearExpiry.length}</p>
           <p className="text-xs text-slate-400">batches</p>
         </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Top Selling Medicines</h2>
+        <ul className="divide-y divide-slate-100">
+          {topSelling.map((item, index) => (
+            <li key={index} className="flex items-center justify-between py-2 text-sm">
+              <p className="font-medium text-slate-800">{item.medicineName}</p>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                {item.quantitySold} sold
+              </span>
+            </li>
+          ))}
+          {topSelling.length === 0 && (
+            <p className="py-2 text-sm text-slate-400">No sales yet.</p>
+          )}
+        </ul>
+      </div>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5">
