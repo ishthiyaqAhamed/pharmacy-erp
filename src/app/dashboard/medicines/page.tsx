@@ -17,9 +17,12 @@ export default async function MedicinesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Inventory</h1>
-        <p className="text-sm text-slate-500">Medicines, batches, and stock</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Inventory</h1>
+          <p className="text-sm text-slate-500">Medicines, batches, and stock</p>
+        </div>
+        <a href="/dashboard/medicines/new" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Add Medicine</a>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
