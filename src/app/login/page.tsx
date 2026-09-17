@@ -205,7 +205,7 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-zinc-500">Sign in to manage inventory & sales</p>
         </div>
 
-        {/* Tab Switcher: OTP vs Password */}
+        {/* Tab Switcher: User (OTP) vs Admin Portal */}
         <div className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 border border-zinc-200">
           <button
             type="button"
@@ -219,7 +219,7 @@ export default function LoginPage() {
                 : "text-zinc-600 hover:text-black"
             }`}
           >
-            Sign in with OTP
+            Sign in as User
           </button>
           <button
             type="button"
@@ -233,7 +233,7 @@ export default function LoginPage() {
                 : "text-zinc-600 hover:text-black"
             }`}
           >
-            Sign in as Admin
+            Admin Portal
           </button>
         </div>
 
@@ -420,7 +420,7 @@ export default function LoginPage() {
                   <span>Signing in...</span>
                 </>
               ) : (
-                "Sign In as Admin"
+                "Sign In to Admin Portal"
               )}
             </button>
           </form>
