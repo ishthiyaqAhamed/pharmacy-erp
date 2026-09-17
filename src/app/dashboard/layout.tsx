@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -23,11 +24,31 @@ export default async function DashboardLayout({
         </div>
 
         <nav className="px-3 py-4 space-y-1">
-  <a href="/dashboard" className="block rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">Overview</a>
-  <a href="/dashboard/medicines" className="block rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">Inventory</a>
-  <a href="/dashboard/sales" className="block rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">Sales</a>
-  <a href="/dashboard/sales/new" className="block rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">New Sale</a>
-</nav>
+          <Link
+            href="/dashboard"
+            className="block rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            Overview
+          </Link>
+          <Link
+            href="/dashboard/medicines"
+            className="block rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            Inventory
+          </Link>
+          <Link
+            href="/dashboard/sales"
+            className="block rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            Sales
+          </Link>
+          <Link
+            href="/dashboard/sales/new"
+            className="block rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            New Sale
+          </Link>
+        </nav>
 
         <div className="px-3 py-4">
           <form
@@ -36,7 +57,10 @@ export default async function DashboardLayout({
               await signOut({ redirectTo: "/login" });
             }}
           >
-            <button className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-100">
+            <button
+              type="submit"
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-100 transition-colors"
+            >
               Sign out
             </button>
           </form>

@@ -30,11 +30,22 @@ model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
-  password  String
+  password  String?
   role      Role     @default(CASHIER)
   branchId  String?
   branch    Branch?  @relation(fields: [branchId], references: [id])
   createdAt DateTime @default(now())
+}
+
+model OtpToken {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  type      String   // "LOGIN" | "SIGNUP"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email, type])
 }
 
 model Medicine {
