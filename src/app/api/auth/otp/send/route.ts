@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       message: `A 6-digit verification code has been sent to ${normalizedEmail}.`,
       devCode: mailResult.devCode, // populated in dev/preview for quick debugging
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error sending OTP:", error);
     return NextResponse.json({ error: "Failed to send verification code. Please try again." }, { status: 500 });
   }

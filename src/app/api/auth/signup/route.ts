@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       message: "Account created successfully!",
       user,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error creating user:", error);
     return NextResponse.json({ error: "Failed to create account. Please try again." }, { status: 500 });
   }

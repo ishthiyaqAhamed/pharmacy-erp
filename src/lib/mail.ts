@@ -76,12 +76,13 @@ export async function sendOtpEmail({ to, otp, type }: SendOtpEmailParams): Promi
     });
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to send OTP email via SMTP:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error sending email";
     return {
       success: true, // Gracefully fallback so dev flow is not blocked
       devCode: isDevelopment ? otp : undefined,
-      error: error?.message,
+      error: errorMessage,
     };
   }
 }
