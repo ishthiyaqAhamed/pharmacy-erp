@@ -233,7 +233,7 @@ export default function LoginPage() {
                 : "text-zinc-600 hover:text-black"
             }`}
           >
-            Password
+            Sign in as Admin
           </button>
         </div>
 
@@ -420,7 +420,7 @@ export default function LoginPage() {
                   <span>Signing in...</span>
                 </>
               ) : (
-                "Sign In with Password"
+                "Sign In as Admin"
               )}
             </button>
           </form>
