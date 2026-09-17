@@ -79,7 +79,7 @@ export async function POST(req: Request) {
       data: {
         name: name.trim(),
         email: normalizedEmail,
-        password: hashedPassword,
+        password: hashedPassword ?? null,
         role: assignedRole,
         branchId: assignedBranchId,
       },
