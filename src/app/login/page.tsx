@@ -1,18 +1,22 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const registered = searchParams.get("registered");
+  const prefillEmail = searchParams.get("email") || "";
+
   const [authMode, setAuthMode] = useState<"otp" | "password">("otp");
 
-  // Form states
-  const [email, setEmail] = useState("");
+  // Form states initialized directly from searchParams
+  const [email, setEmail] = useState(prefillEmail);
   const [password, setPassword] = useState("");
-  
+
   // OTP states
   const [otpStep, setOtpStep] = useState<"email" | "code">("email");
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
@@ -22,7 +26,9 @@ export default function LoginPage() {
   // Status states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(
+    registered ? "Account created successfully! Please sign in with your email." : null
+  );
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -38,7 +44,8 @@ export default function LoginPage() {
   // Handle requesting OTP for login
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!email.trim()) {
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
       setError("Please enter your email address.");
       return;
     }
@@ -53,7 +60,7 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: email.trim(),
+          email: cleanEmail,
           type: "LOGIN",
         }),
       });
@@ -69,16 +76,15 @@ export default function LoginPage() {
       }
 
       setOtpStep("code");
-      setCountdown(45);
-      setInfoMessage(`We sent a 6-digit code to ${email.trim()}`);
+      setCountdown(30);
+      setInfoMessage(`We sent a 6-digit code to ${cleanEmail}`);
       if (data.devCode) {
         setDevPreviewCode(data.devCode);
       }
 
-      // Focus the first OTP input
       setTimeout(() => {
         otpInputRefs.current[0]?.focus();
-      }, 100);
+      }, 150);
     } catch {
       setError("Unable to connect to the server. Please try again.");
     } finally {
@@ -86,30 +92,36 @@ export default function LoginPage() {
     }
   };
 
-  // Handle OTP digit change
-  const handleDigitChange = (index: number, value: string) => {
-    const cleanVal = value.replace(/\D/g, "");
-    if (!cleanVal) {
+  // Robust OTP digit change
+  const handleDigitChange = (index: number, val: string) => {
+    const digitsOnly = val.replace(/\D/g, "");
+
+    // If empty
+    if (!digitsOnly) {
       const newDigits = [...otpDigits];
       newDigits[index] = "";
       setOtpDigits(newDigits);
       return;
     }
 
-    if (cleanVal.length > 1) {
-      const pasted = cleanVal.slice(0, 6).split("");
+    // If user pasted or typed multiple digits
+    if (digitsOnly.length > 1) {
+      const pastedChars = digitsOnly.slice(0, 6).split("");
       const newDigits = [...otpDigits];
       for (let i = 0; i < 6; i++) {
-        if (pasted[i]) newDigits[i] = pasted[i];
+        if (pastedChars[i] !== undefined) {
+          newDigits[i] = pastedChars[i];
+        }
       }
       setOtpDigits(newDigits);
-      const nextIndex = Math.min(pasted.length, 5);
-      otpInputRefs.current[nextIndex]?.focus();
+      const targetFocus = Math.min(pastedChars.length, 5);
+      otpInputRefs.current[targetFocus]?.focus();
       return;
     }
 
+    // Single digit entry
     const newDigits = [...otpDigits];
-    newDigits[index] = cleanVal;
+    newDigits[index] = digitsOnly;
     setOtpDigits(newDigits);
 
     if (index < 5) {
@@ -117,9 +129,38 @@ export default function LoginPage() {
     }
   };
 
+  // Dedicated paste handler
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pastedText) return;
+
+    const newDigits = [...otpDigits];
+    const chars = pastedText.split("");
+    for (let i = 0; i < 6; i++) {
+      newDigits[i] = chars[i] || "";
+    }
+    setOtpDigits(newDigits);
+    const targetFocus = Math.min(chars.length, 5);
+    otpInputRefs.current[targetFocus]?.focus();
+  };
+
   const handleDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
+    if (e.key === "Backspace") {
+      if (otpDigits[index] === "" && index > 0) {
+        const newDigits = [...otpDigits];
+        newDigits[index - 1] = "";
+        setOtpDigits(newDigits);
+        otpInputRefs.current[index - 1]?.focus();
+      } else {
+        const newDigits = [...otpDigits];
+        newDigits[index] = "";
+        setOtpDigits(newDigits);
+      }
+    } else if (e.key === "ArrowLeft" && index > 0) {
       otpInputRefs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowRight" && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
     }
   };
 
@@ -144,12 +185,12 @@ export default function LoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         otp: enteredCode,
         redirect: false,
       });
 
-      if (result?.error) {
+      if (!result || result.error) {
         setError("Invalid or expired verification code. Please check and try again.");
         return;
       }
@@ -163,7 +204,7 @@ export default function LoginPage() {
     }
   };
 
-  // Handle standard password login
+  // Handle standard password login (Admin Portal)
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -171,12 +212,12 @@ export default function LoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
         redirect: false,
       });
 
-      if (result?.error) {
+      if (!result || result.error) {
         setError("Invalid email or password.");
         return;
       }
@@ -213,7 +254,7 @@ export default function LoginPage() {
               setAuthMode("otp");
               setError(null);
             }}
-            className={`rounded-lg py-2 text-xs font-semibold transition-all ${
+            className={`rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer ${
               authMode === "otp"
                 ? "bg-black text-white shadow-sm"
                 : "text-zinc-600 hover:text-black"
@@ -227,7 +268,7 @@ export default function LoginPage() {
               setAuthMode("password");
               setError(null);
             }}
-            className={`rounded-lg py-2 text-xs font-semibold transition-all ${
+            className={`rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer ${
               authMode === "password"
                 ? "bg-black text-white shadow-sm"
                 : "text-zinc-600 hover:text-black"
@@ -264,14 +305,14 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={handleAutofillDevCode}
-              className="rounded border border-black bg-black px-2 py-1 text-xs font-semibold text-white hover:bg-zinc-800 transition-colors"
+              className="rounded border border-black bg-black px-2.5 py-1 text-xs font-semibold text-white hover:bg-zinc-800 transition-colors cursor-pointer"
             >
               Fill Code
             </button>
           </div>
         )}
 
-        {/* OTP AUTHENTICATION FLOW */}
+        {/* USER OTP AUTHENTICATION FLOW */}
         {authMode === "otp" && (
           <div>
             {otpStep === "email" ? (
@@ -317,7 +358,7 @@ export default function LoginPage() {
                       setOtpDigits(["", "", "", "", "", ""]);
                       setDevPreviewCode(null);
                     }}
-                    className="text-black hover:underline font-semibold"
+                    className="text-black hover:underline font-semibold cursor-pointer"
                   >
                     Change
                   </button>
@@ -328,7 +369,7 @@ export default function LoginPage() {
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 text-center block">
                     Enter 6-Digit Code
                   </label>
-                  <div className="flex justify-between gap-2">
+                  <div className="flex justify-between gap-2" onPaste={handlePaste}>
                     {otpDigits.map((digit, idx) => (
                       <input
                         key={idx}
@@ -337,6 +378,7 @@ export default function LoginPage() {
                         }}
                         type="text"
                         inputMode="numeric"
+                        autoComplete="one-time-code"
                         maxLength={6}
                         value={digit}
                         onChange={(e) => handleDigitChange(idx, e.target.value)}
@@ -382,11 +424,11 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* PASSWORD AUTHENTICATION FLOW */}
+        {/* ADMIN PASSWORD AUTHENTICATION FLOW */}
         {authMode === "password" && (
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700">Email</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700">Admin Email</label>
               <input
                 type="email"
                 required
@@ -436,5 +478,13 @@ export default function LoginPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-zinc-100 text-zinc-900">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

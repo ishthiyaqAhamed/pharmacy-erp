@@ -19,19 +19,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = credentials?.password as string | undefined;
         const otp = credentials?.otp as string | undefined;
 
-        if (!email) return null;
-        const normalizedEmail = email.toLowerCase().trim();
+        if (!email) {
+          console.log("[AUTH ERROR] Missing email in credentials");
+          return null;
+        }
 
-        const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-        if (!user) return null;
+        const normalizedEmail = email.toLowerCase().trim();
+        console.log(`[AUTH ATTEMPT] Email: ${normalizedEmail}, Has OTP: ${!!otp}, Has Password: ${!!password}`);
+
+        const user = await prisma.user.findFirst({
+          where: {
+            email: { equals: normalizedEmail, mode: "insensitive" },
+          },
+        });
+
+        if (!user) {
+          console.log(`[AUTH ERROR] User not found for email: ${normalizedEmail}`);
+          return null;
+        }
 
         // 1. Authenticate with OTP if provided
         if (otp && typeof otp === "string" && otp.trim().length > 0) {
           const otpResult = await verifyAndConsumeOtp(normalizedEmail, otp.trim(), "LOGIN");
           if (!otpResult.valid) {
+            console.log(`[AUTH OTP REJECTED] ${otpResult.message}`);
             return null;
           }
 
+          console.log(`[AUTH SUCCESS] User authenticated with OTP: ${user.email} (${user.role})`);
           return {
             id: user.id,
             name: user.name,
@@ -44,8 +59,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // 2. Authenticate with Password if provided
         if (password && typeof password === "string" && user.password) {
           const isValid = await bcrypt.compare(password, user.password);
-          if (!isValid) return null;
+          if (!isValid) {
+            console.log(`[AUTH PASSWORD REJECTED] Password mismatch for ${user.email}`);
+            return null;
+          }
 
+          console.log(`[AUTH SUCCESS] User authenticated with Password: ${user.email} (${user.role})`);
           return {
             id: user.id,
             name: user.name,
@@ -55,6 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           };
         }
 
+        console.log("[AUTH ERROR] Neither valid OTP nor Password provided");
         return null;
       },
     }),

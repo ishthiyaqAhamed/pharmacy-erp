@@ -26,8 +26,10 @@ export async function POST(req: Request) {
     const normalizedEmail = email.toLowerCase().trim();
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: { equals: normalizedEmail, mode: "insensitive" },
+      },
     });
 
     if (existingUser) {
@@ -38,7 +40,7 @@ export async function POST(req: Request) {
     }
 
     // Verify and consume the OTP token
-    const otpVerification = await verifyAndConsumeOtp(normalizedEmail, otp, "SIGNUP");
+    const otpVerification = await verifyAndConsumeOtp(normalizedEmail, otp.trim(), "SIGNUP");
     if (!otpVerification.valid) {
       return NextResponse.json(
         { error: otpVerification.message || "Invalid or expired verification code." },
@@ -69,7 +71,6 @@ export async function POST(req: Request) {
     }
 
     if (!assignedBranchId) {
-      // Find first existing branch as fallback if available
       const defaultBranch = await prisma.branch.findFirst();
       if (defaultBranch) {
         assignedBranchId = defaultBranch.id;

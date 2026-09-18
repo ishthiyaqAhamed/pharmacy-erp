@@ -13,7 +13,6 @@ interface Branch {
 
 export default function SignupPage() {
   const router = useRouter();
-
   // Form states
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -64,13 +63,16 @@ export default function SignupPage() {
   }, [countdown]);
 
   // Request OTP for Signup
-  const handleRequestSignupOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
+  const handleRequestSignupOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanName = name.trim();
+    const cleanEmail = email.trim();
+
+    if (!cleanName) {
       setError("Please enter your full name.");
       return;
     }
-    if (!email.trim()) {
+    if (!cleanEmail) {
       setError("Please enter your email address.");
       return;
     }
@@ -85,7 +87,7 @@ export default function SignupPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: email.trim(),
+          email: cleanEmail,
           type: "SIGNUP",
         }),
       });
@@ -101,16 +103,15 @@ export default function SignupPage() {
       }
 
       setStep("verify");
-      setCountdown(45);
-      setInfoMessage(`We sent a 6-digit confirmation code to ${email.trim()}`);
+      setCountdown(30);
+      setInfoMessage(`We sent a 6-digit confirmation code to ${cleanEmail}`);
       if (data.devCode) {
         setDevPreviewCode(data.devCode);
       }
 
-      // Auto-focus first digit
       setTimeout(() => {
         otpInputRefs.current[0]?.focus();
-      }, 100);
+      }, 150);
     } catch {
       setError("Unable to connect to the server. Please try again.");
     } finally {
@@ -118,30 +119,33 @@ export default function SignupPage() {
     }
   };
 
-  // Handle OTP digit changes
-  const handleDigitChange = (index: number, value: string) => {
-    const cleanVal = value.replace(/\D/g, "");
-    if (!cleanVal) {
+  // Robust OTP digit change
+  const handleDigitChange = (index: number, val: string) => {
+    const digitsOnly = val.replace(/\D/g, "");
+
+    if (!digitsOnly) {
       const newDigits = [...otpDigits];
       newDigits[index] = "";
       setOtpDigits(newDigits);
       return;
     }
 
-    if (cleanVal.length > 1) {
-      const pasted = cleanVal.slice(0, 6).split("");
+    if (digitsOnly.length > 1) {
+      const pastedChars = digitsOnly.slice(0, 6).split("");
       const newDigits = [...otpDigits];
       for (let i = 0; i < 6; i++) {
-        if (pasted[i]) newDigits[i] = pasted[i];
+        if (pastedChars[i] !== undefined) {
+          newDigits[i] = pastedChars[i];
+        }
       }
       setOtpDigits(newDigits);
-      const nextIndex = Math.min(pasted.length, 5);
-      otpInputRefs.current[nextIndex]?.focus();
+      const targetFocus = Math.min(pastedChars.length, 5);
+      otpInputRefs.current[targetFocus]?.focus();
       return;
     }
 
     const newDigits = [...otpDigits];
-    newDigits[index] = cleanVal;
+    newDigits[index] = digitsOnly;
     setOtpDigits(newDigits);
 
     if (index < 5) {
@@ -149,9 +153,38 @@ export default function SignupPage() {
     }
   };
 
+  // Dedicated paste handler
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pastedText) return;
+
+    const newDigits = [...otpDigits];
+    const chars = pastedText.split("");
+    for (let i = 0; i < 6; i++) {
+      newDigits[i] = chars[i] || "";
+    }
+    setOtpDigits(newDigits);
+    const targetFocus = Math.min(chars.length, 5);
+    otpInputRefs.current[targetFocus]?.focus();
+  };
+
   const handleDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
+    if (e.key === "Backspace") {
+      if (otpDigits[index] === "" && index > 0) {
+        const newDigits = [...otpDigits];
+        newDigits[index - 1] = "";
+        setOtpDigits(newDigits);
+        otpInputRefs.current[index - 1]?.focus();
+      } else {
+        const newDigits = [...otpDigits];
+        newDigits[index] = "";
+        setOtpDigits(newDigits);
+      }
+    } else if (e.key === "ArrowLeft" && index > 0) {
       otpInputRefs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowRight" && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
     }
   };
 
@@ -175,12 +208,13 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
+      const cleanEmail = email.trim().toLowerCase();
       const signupRes = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          email: email.trim(),
+          email: cleanEmail,
           password: password || undefined,
           role,
           branchId: branchId || undefined,
@@ -195,23 +229,23 @@ export default function SignupPage() {
         return;
       }
 
+      // If user provided password, sign them in directly
       if (password) {
         const loginRes = await signIn("credentials", {
-          email: email.trim(),
+          email: cleanEmail,
           password,
           redirect: false,
         });
 
-        if (loginRes?.error) {
-          router.push("/login?registered=true");
+        if (loginRes && !loginRes.error) {
+          router.push("/dashboard");
+          router.refresh();
           return;
         }
-      } else {
-        router.push("/login?registered=true");
-        return;
       }
 
-      router.push("/dashboard");
+      // Redirect to login with pre-filled email
+      router.push(`/login?registered=true&email=${encodeURIComponent(cleanEmail)}`);
       router.refresh();
     } catch {
       setError("An unexpected error occurred. Please try again.");
@@ -285,7 +319,7 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={handleAutofillDevCode}
-              className="rounded border border-black bg-black px-2 py-1 text-xs font-semibold text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="rounded border border-black bg-black px-2.5 py-1 text-xs font-semibold text-white hover:bg-zinc-800 transition-colors cursor-pointer"
             >
               Fill Code
             </button>
@@ -356,7 +390,7 @@ export default function SignupPage() {
               <div className="space-y-1.5 sm:col-span-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-700">Password</label>
-                  <span className="text-[11px] text-zinc-500">(Optional for password login)</span>
+                  <span className="text-[11px] text-zinc-500">(Optional for admin/password login)</span>
                 </div>
                 <input
                   type="password"
@@ -395,7 +429,7 @@ export default function SignupPage() {
                   setOtpDigits(["", "", "", "", "", ""]);
                   setDevPreviewCode(null);
                 }}
-                className="text-black hover:underline font-semibold"
+                className="text-black hover:underline font-semibold cursor-pointer"
               >
                 Change Details
               </button>
@@ -406,7 +440,7 @@ export default function SignupPage() {
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 text-center block">
                 Enter 6-Digit OTP Code
               </label>
-              <div className="flex justify-between gap-2">
+              <div className="flex justify-between gap-2" onPaste={handlePaste}>
                 {otpDigits.map((digit, idx) => (
                   <input
                     key={idx}
@@ -415,6 +449,7 @@ export default function SignupPage() {
                     }}
                     type="text"
                     inputMode="numeric"
+                    autoComplete="one-time-code"
                     maxLength={6}
                     value={digit}
                     onChange={(e) => handleDigitChange(idx, e.target.value)}
@@ -448,7 +483,7 @@ export default function SignupPage() {
                 <button
                   type="button"
                   disabled={loading}
-                  onClick={(e) => handleRequestSignupOtp(e)}
+                  onClick={() => handleRequestSignupOtp()}
                   className="font-semibold text-black hover:underline cursor-pointer"
                 >
                   Resend Code

@@ -24,14 +24,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid OTP type. Expected LOGIN or SIGNUP." }, { status: 400 });
     }
 
-    // Check user existence according to auth flow
-    const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+    // Check user existence with case-insensitive search
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: { equals: normalizedEmail, mode: "insensitive" },
+      },
     });
 
     if (type === "LOGIN" && !existingUser) {
       return NextResponse.json(
-        { error: "No account found with this email. Please create an account first." },
+        { error: "No account found with this email. Please sign up first." },
         { status: 404 }
       );
     }
@@ -55,8 +57,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Generate and store OTP
-    const { code } = await createOtpToken(normalizedEmail, type, 5);
+    // Generate and store OTP (valid for 10 minutes)
+    const { code } = await createOtpToken(normalizedEmail, type, 10);
 
     // Send Email
     const mailResult = await sendOtpEmail({
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: `A 6-digit verification code has been sent to ${normalizedEmail}.`,
-      devCode: mailResult.devCode, // populated in dev/preview for quick debugging
+      devCode: mailResult.devCode,
     });
   } catch (error) {
     console.error("Error sending OTP:", error);
